@@ -4,7 +4,7 @@ version: 3.1.0
 homepage: https://github.com/SebastianKlaiber/google_maps_cluster_manager
 
 environment:
-  sdk: ^3.2.0
+  sdk: ^3.1.5
 
 dependencies:
   flutter:
