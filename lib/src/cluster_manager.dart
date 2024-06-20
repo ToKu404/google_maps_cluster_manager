@@ -66,6 +66,7 @@ class ClusterManager<T extends ClusterItem> {
   /// Retrieve cluster markers
   Future<List<Cluster<T>>> getMarkers(List<T> items) async {
     if (_mapId == null) return List.empty();
+    _zoom = await GoogleMapsFlutterPlatform.instance.getZoomLevel(mapId: _mapId!);
     late List<T> visibleItems;
 
     final mapBounds = await GoogleMapsFlutterPlatform.instance
