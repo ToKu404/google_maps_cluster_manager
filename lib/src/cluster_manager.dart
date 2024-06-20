@@ -1,3 +1,5 @@
+// ignore_for_file: use_setters_to_change_properties
+
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:google_maps_cluster_manager_2/google_maps_cluster_manager_2.dart';
@@ -59,43 +61,55 @@ class ClusterManager<T extends ClusterItem> {
     _zoom = await GoogleMapsFlutterPlatform.instance.getZoomLevel(mapId: mapId);
   }
 
+  bool firstInit = true;
+
   /// Retrieve cluster markers
   Future<List<Cluster<T>>> getMarkers(List<T> items) async {
     if (_mapId == null) return List.empty();
+    late List<T> visibleItems;
 
     final mapBounds = await GoogleMapsFlutterPlatform.instance
         .getVisibleRegion(mapId: _mapId!);
 
-    late LatLngBounds inflatedBounds;
-    if (clusterAlgorithm == ClusterAlgorithm.geoHash) {
-      inflatedBounds = _inflateBounds(mapBounds);
+    if (firstInit) {
+      visibleItems = items;
     } else {
-      inflatedBounds = mapBounds;
+      late LatLngBounds inflatedBounds;
+      if (clusterAlgorithm == ClusterAlgorithm.geoHash) {
+        inflatedBounds = _inflateBounds(mapBounds);
+      } else {
+        inflatedBounds = mapBounds;
+      }
+
+      visibleItems = items.where((i) {
+        return inflatedBounds.contains(i.location);
+      }).toList();
+
+      if (stopClusteringZoom != null && _zoom >= stopClusteringZoom!) {
+        return visibleItems.map((i) => Cluster<T>.fromItems([i])).toList();
+      }
     }
-
-    final visibleItems = items.where((i) {
-      return inflatedBounds.contains(i.location);
-    }).toList();
-
-    if (stopClusteringZoom != null && _zoom >= stopClusteringZoom!) {
-      return visibleItems.map((i) => Cluster<T>.fromItems([i])).toList();
-    }
-
     List<Cluster<T>> markers;
 
     if (clusterAlgorithm == ClusterAlgorithm.geoHash ||
         visibleItems.length >= maxItemsForMaxDistAlgo) {
       final level = _findLevel(levels);
-      markers = _computeClusters(visibleItems, List.empty(growable: true),
-          level: level);
+
+      markers = _computeClusters(
+        visibleItems,
+        List.empty(growable: true),
+        level: level,
+      );
     } else {
       markers = _computeClustersWithMaxDist(visibleItems, _zoom);
     }
-
+    if (firstInit) {
+      firstInit = false;
+    }
     return markers;
   }
 
-  void updateZoom(double zoom){
+  void updateZoom(double zoom) {
     _zoom = zoom;
   }
 
@@ -125,9 +139,20 @@ class ClusterManager<T extends ClusterItem> {
     );
   }
 
-  void onCameraUpdate(CameraUpdate cameraUpdate){
-     GoogleMapsFlutterPlatform.instance.animateCamera(cameraUpdate,
-                mapId: _mapId!);
+  void updateMap(Set<Marker> previous, Set<Marker> current) {
+    GoogleMapsFlutterPlatform.instance
+        .updateMarkers(MarkerUpdates.from(previous, current), mapId: _mapId!);
+  }
+
+  Future<void> onCameraUpdate(CameraUpdate cameraUpdate) async {
+    await GoogleMapsFlutterPlatform.instance
+        .animateCamera(cameraUpdate, mapId: _mapId!);
+    _zoom =
+        await GoogleMapsFlutterPlatform.instance.getZoomLevel(mapId: _mapId!);
+  }
+
+  double getZoomLevel() {
+    return _zoom;
   }
 
   int _findLevel(List<double> levels) {
