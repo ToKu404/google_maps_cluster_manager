@@ -1,10 +1,6 @@
-// ignore_for_file: use_setters_to_change_properties
-
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:google_maps_cluster_manager_2/google_maps_cluster_manager_2.dart';
-import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart'
-    hide Cluster;
 
 enum ClusterAlgorithm { geoHash, maxDist }
 
@@ -50,23 +46,27 @@ class ClusterManager<T extends ClusterItem> {
   /// Google Maps map id
   int? _mapId;
 
-  /// Last known zoom
-  late double _zoom;
-
   final double _maxLng = 180 - pow(10, -10.0) as double;
 
   /// Set Google Map Id for the cluster manager
   Future<void> setMapId(int mapId) async {
     _mapId = mapId;
-    _zoom = await GoogleMapsFlutterPlatform.instance.getZoomLevel(mapId: mapId);
   }
 
   bool firstInit = true;
 
+  int lastLevel = -1;
+  int lastMarkerCount = -1;
+  List<Cluster<T>> markers = [];
+
   /// Retrieve cluster markers
-  Future<List<Cluster<T>>> getMarkers(List<T> items) async {
+  Future<List<Cluster<T>>> getMarkers(
+    List<T> items,
+    double zoom, {
+    bool increaseLevel = false,
+  }) async {
     if (_mapId == null) return List.empty();
-    _zoom = await GoogleMapsFlutterPlatform.instance.getZoomLevel(mapId: _mapId!);
+
     late List<T> visibleItems;
 
     final mapBounds = await GoogleMapsFlutterPlatform.instance
@@ -86,32 +86,36 @@ class ClusterManager<T extends ClusterItem> {
         return inflatedBounds.contains(i.location);
       }).toList();
 
-      if (stopClusteringZoom != null && _zoom >= stopClusteringZoom!) {
+      if (stopClusteringZoom != null && zoom >= stopClusteringZoom!) {
+        lastMarkerCount = visibleItems.length;
         return visibleItems.map((i) => Cluster<T>.fromItems([i])).toList();
       }
     }
-    List<Cluster<T>> markers;
 
     if (clusterAlgorithm == ClusterAlgorithm.geoHash ||
         visibleItems.length >= maxItemsForMaxDistAlgo) {
-      final level = _findLevel(levels);
+      var level = _findLevel(levels, zoom);
+      do {
+        markers = _computeClusters(
+          visibleItems,
+          List.empty(growable: true),
+          level: level,
+        );
+        level++;
+      } while (increaseLevel &&
+          markers.length == lastMarkerCount &&
+          level < levels.length);
 
-      markers = _computeClusters(
-        visibleItems,
-        List.empty(growable: true),
-        level: level,
-      );
+      lastLevel = level;
     } else {
-      markers = _computeClustersWithMaxDist(visibleItems, _zoom);
+      markers = _computeClustersWithMaxDist(visibleItems, zoom);
     }
     if (firstInit) {
       firstInit = false;
     }
-    return markers;
-  }
+    lastMarkerCount = markers.length;
 
-  void updateZoom(double zoom) {
-    _zoom = zoom;
+    return markers;
   }
 
   LatLngBounds _inflateBounds(LatLngBounds bounds) {
@@ -148,17 +152,11 @@ class ClusterManager<T extends ClusterItem> {
   Future<void> onCameraUpdate(CameraUpdate cameraUpdate) async {
     await GoogleMapsFlutterPlatform.instance
         .animateCamera(cameraUpdate, mapId: _mapId!);
-    _zoom =
-        await GoogleMapsFlutterPlatform.instance.getZoomLevel(mapId: _mapId!);
   }
 
-  double getZoomLevel() {
-    return _zoom;
-  }
-
-  int _findLevel(List<double> levels) {
+  int _findLevel(List<double> levels, double zoom) {
     for (var i = levels.length - 1; i >= 0; i--) {
-      if (levels[i] <= _zoom) {
+      if (levels[i] <= zoom) {
         return i + 1;
       }
     }
