@@ -58,6 +58,7 @@ class ClusterManager<T extends ClusterItem> {
   int lastLevel = -1;
   int lastMarkerCount = -1;
   List<Cluster<T>> markers = [];
+  List<Cluster<T>> allMarkers = <Cluster<T>>[];
 
   /// Retrieve cluster markers
   Future<List<Cluster<T>>> getMarkers(
@@ -101,9 +102,16 @@ class ClusterManager<T extends ClusterItem> {
           List.empty(growable: true),
           level: level,
         );
+        allMarkers = _computeClusters(
+          items,
+          List.empty(growable: true),
+          level: level,
+        );
+        debugPrint("TOKU OLD ${lastMarkerCount}");
+        debugPrint("TOKU NEW ${allMarkers.length}");
         level++;
       } while (increaseLevel &&
-          markers.length == lastMarkerCount &&
+          allMarkers.length <= lastMarkerCount &&
           level < levels.length);
 
       lastLevel = level;
@@ -113,8 +121,9 @@ class ClusterManager<T extends ClusterItem> {
     if (firstInit) {
       firstInit = false;
     }
-    lastMarkerCount = markers.length;
-
+    // if (increaseLevel) {
+    lastMarkerCount = allMarkers.length;
+    // }
     return markers;
   }
 
