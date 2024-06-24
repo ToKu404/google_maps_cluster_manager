@@ -107,8 +107,6 @@ class ClusterManager<T extends ClusterItem> {
           List.empty(growable: true),
           level: level,
         );
-        debugPrint("TOKU OLD ${lastMarkerCount}");
-        debugPrint("TOKU NEW ${allMarkers.length}");
         level++;
       } while (increaseLevel &&
           allMarkers.length <= lastMarkerCount &&
