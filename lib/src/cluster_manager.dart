@@ -64,7 +64,8 @@ class ClusterManager<T extends ClusterItem> {
   Future<List<Cluster<T>>> getMarkers(
     List<T> items,
     double zoom, {
-    bool increaseLevel = false,
+    bool moveByClickCluster = false,
+    bool withoutClustering = false,
   }) async {
     if (_mapId == null) return List.empty();
 
@@ -75,6 +76,8 @@ class ClusterManager<T extends ClusterItem> {
 
     if (firstInit) {
       visibleItems = items;
+    } else if (withoutClustering) {
+      return items.map((i) => Cluster<T>.fromItems([i])).toList();
     } else {
       late LatLngBounds inflatedBounds;
       if (clusterAlgorithm == ClusterAlgorithm.geoHash) {
@@ -108,7 +111,7 @@ class ClusterManager<T extends ClusterItem> {
           level: level,
         );
         level++;
-      } while (increaseLevel &&
+      } while (moveByClickCluster &&
           allMarkers.length <= lastMarkerCount &&
           level < levels.length);
 
@@ -126,7 +129,6 @@ class ClusterManager<T extends ClusterItem> {
   }
 
   LatLngBounds _inflateBounds(LatLngBounds bounds) {
-    // Bounds that cross the date line expand compared to their difference with the date line
     var lng = 0.0;
     if (bounds.northeast.longitude < bounds.southwest.longitude) {
       lng = extraPercent *
@@ -137,7 +139,6 @@ class ClusterManager<T extends ClusterItem> {
           (bounds.northeast.longitude - bounds.southwest.longitude);
     }
 
-    // Latitudes expanded beyond +/- 90 are automatically clamped by LatLng
     final lat =
         extraPercent * (bounds.northeast.latitude - bounds.southwest.latitude);
 
