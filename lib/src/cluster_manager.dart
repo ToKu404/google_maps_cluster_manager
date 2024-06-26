@@ -122,9 +122,7 @@ class ClusterManager<T extends ClusterItem> {
     if (firstInit) {
       firstInit = false;
     }
-    // if (increaseLevel) {
     lastMarkerCount = allMarkers.length;
-    // }
     return markers;
   }
 
@@ -192,8 +190,10 @@ class ClusterManager<T extends ClusterItem> {
   }
 
   List<Cluster<T>> _computeClusters(
-      List<T> inputItems, List<Cluster<T>> markerItems,
-      {int level = 5}) {
+    List<T> inputItems,
+    List<Cluster<T>> markerItems, {
+    int level = 5,
+  }) {
     if (inputItems.isEmpty) return markerItems;
     final nextGeohash = inputItems[0].geohash.substring(0, level);
 
